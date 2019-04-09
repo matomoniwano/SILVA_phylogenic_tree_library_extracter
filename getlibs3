@@ -1,0 +1,80 @@
+#!/bin/bash
+if [ $# -ne 3 ] ; then
+    echo "Usage:"
+    echo "$0 GIT_DIR INST_ABSOLUTE_TARGET OVERWRITE_CSS"
+    exit 1
+else
+    GIT_DIR="$1"
+    LIB_DIR="$2/lib"
+    FORCE_CSS="$3"
+    echo "Downloading libs to web directory '$LIB_DIR' "
+fi
+
+CSSLIST=()
+
+WEB="$LIB_DIR"
+
+mkdir -p "$WEB"
+
+[ -w "$WEB" ] || (echo "Cannot write to $WEB !" && exit 1)
+
+websites=()
+filepath="$PWD/url.txt"
+pat=$(cat $filepath)
+for url in $pat
+do
+websites+=("$url")
+done
+
+pushd $WEB
+
+error=()
+
+for website in ${websites[@]}
+do
+	[ -f ${website##*/} ] || wget $website
+        if [ $? != 0 ] ;
+	then
+		error+=($website)
+	fi
+done
+
+cp $GIT_DIR/www-lib/treeviewer.js . || exit 1
+cp $GIT_DIR/www-lib/leaflet-phylogenscale.js . || exit 1
+cp $GIT_DIR/www-lib/leaflet-scrollbar.js . || exit 1
+
+CSSLIST+=($GIT_DIR/www-lib/treeviewer.css)
+CSSLIST+=($GIT_DIR/www-lib/leaflet-scrollbar.css)
+
+for cssitm in "${CSSLIST[@]}" ; do
+    cssfile=${cssitm##*/}
+    if [  $FORCE_CSS -eq 1 ] ; then
+        rm -f $cssfile
+    fi
+    [ -f $cssfile ] || cp -v "$cssitm" . || exit 1
+done
+
+if [ ! -f jquery-1.11.3.min.js ] ; then
+    wget http://code.jquery.com/jquery-1.11.3.min.js
+    ln -s jquery-1.11.3.min.js jquery.min.js
+fi
+if [ ! -f leaflet.js ] ; then
+    wget http://cdn.leafletjs.com/leaflet/v1.0.0-rc.2/leaflet.zip
+    unzip -q leaflet.zip
+    rm leaflet.zip
+fi
+
+popd
+
+for file in ${error[@]}
+do
+	echo "Download unsuccessful from $file"
+done
+
+if [ ${#error[*]} != 0 ];
+then
+	exit 1
+fi
+
+
+
